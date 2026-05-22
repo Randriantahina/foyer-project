@@ -1,6 +1,7 @@
 package com.curiosity.subscription.model;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,6 +25,8 @@ public class Pay {
 	private long id;
 	
 	private boolean isPaid;
+	@Column(name="paid_at")
+	private Timestamp paidAt;
 	@Lob
 	private String note;
 	@Column(name="amount_paid")
