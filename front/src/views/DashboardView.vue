@@ -352,6 +352,9 @@ function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase
                     </div>
                   </td>
                   <td class="px-5 py-4">
+                    <span class="text-sm font-semibold text-gray-900">{{ resident.cotisation }} €</span>
+                  </td>
+                  <td class="px-5 py-4">
                     <span
                       :class="[
                         'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ring-inset',
@@ -385,7 +388,7 @@ function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase
                   </td>
                 </tr>
                 <tr v-if="filteredResidents.length === 0">
-                  <td colspan="4" class="px-5 py-16 text-center text-gray-400 text-sm">
+                  <td colspan="5" class="px-5 py-16 text-center text-gray-400 text-sm">
                     Aucun résident trouvé
                   </td>
                 </tr>
