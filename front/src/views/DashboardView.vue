@@ -1,559 +1,521 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useFoyerStore, MOIS, type Resident, type StatutPaiement } from '@/stores/foyer'
+import { useDashboardViewModel } from '@/viewmodels/useDashboardViewModel'
 import {
-  Users, CheckCircle, AlertCircle, TrendingUp, Plus, Trash2,
-  ChevronLeft, ChevronRight, Search, BarChart3, CalendarDays,
-  LogOut, Building2, X,
+  AlertCircle,
+  BarChart3,
+  Building2,
+  CalendarDays,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Edit3,
+  LogOut,
+  Phone,
+  Plus,
+  Search,
+  Trash2,
+  Users,
+  WalletCards,
+  X,
 } from 'lucide-vue-next'
 
-const store = useFoyerStore()
-
-const MOIS_COURT = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-
-// --- Navigation mois/année ---
-const now = new Date()
-const selectedYear = ref(now.getFullYear())
-const selectedMonth = ref(now.getMonth() + 1)
-const viewMode = ref<'mensuelle' | 'annuelle'>('mensuelle')
-
-function prevMonth() {
-  if (selectedMonth.value === 1) { selectedMonth.value = 12; selectedYear.value-- }
-  else selectedMonth.value--
-}
-function nextMonth() {
-  const n = new Date()
-  if (selectedYear.value === n.getFullYear() && selectedMonth.value >= n.getMonth() + 1) return
-  if (selectedMonth.value === 12) { selectedMonth.value = 1; selectedYear.value++ }
-  else selectedMonth.value++
-}
-function prevYear() { selectedYear.value-- }
-function nextYear() { if (selectedYear.value < new Date().getFullYear()) selectedYear.value++ }
-
-// --- Recherche ---
-const searchQuery = ref('')
-const filteredResidents = computed(() => {
-  if (!searchQuery.value) return store.residents
-  const q = searchQuery.value.toLowerCase()
-  return store.residents.filter(r =>
-    r.nom.toLowerCase().includes(q) ||
-    r.prenom.toLowerCase().includes(q),
-  )
-})
-
-// --- Stats ---
-const stats = computed(() => store.getStatsMois(selectedYear.value, selectedMonth.value))
-const annualStats = computed(() => store.getStatsAnnee(selectedYear.value))
-
-// --- Vue annuelle ---
-const annualMonths = computed(() => {
-  const n = new Date()
-  const max = selectedYear.value === n.getFullYear() ? n.getMonth() + 1 : 12
-  return Array.from({ length: max }, (_, i) => i + 1)
-})
-
-function totalPayeAnnee(residentId: string) {
-  return store.paiements
-    .filter(p => p.residentId === residentId && p.annee === selectedYear.value && p.statut === 'payé')
-    .reduce((sum, p) => sum + p.montant, 0)
-}
-
-function cellDotClass(residentId: string, mois: number) {
-  const s = store.getStatutMois(residentId, selectedYear.value, mois)
-  return s === 'payé' ? 'bg-green-500' : s === 'en_attente' ? 'bg-amber-400' : 'bg-red-500'
-}
-
-function cellTitle(residentId: string, mois: number) {
-  return `${MOIS[mois - 1]} : ${statutLabel(store.getStatutMois(residentId, selectedYear.value, mois))}`
-}
-
-// --- Helpers statut ---
-function statutLabel(s: StatutPaiement) {
-  return s === 'payé' ? 'Payé' : s === 'en_attente' ? 'En attente' : 'En retard'
-}
-function statutBadgeClass(s: StatutPaiement) {
-  return s === 'payé'
-    ? 'bg-green-100 text-green-700 ring-green-200'
-    : s === 'en_attente'
-      ? 'bg-amber-100 text-amber-700 ring-amber-200'
-      : 'bg-red-100 text-red-700 ring-red-200'
-}
-
-// --- Modal ajout ---
-const showAddModal = ref(false)
-const form = ref({ nom: '', prenom: '', dateEntree: now.toISOString().slice(0, 10), cotisation: 450 })
-
-function openAdd() {
-  form.value = { nom: '', prenom: '', dateEntree: new Date().toISOString().slice(0, 10), cotisation: 450 }
-  showAddModal.value = true
-}
-
-function submitAdd() {
-  if (!form.value.nom.trim() || !form.value.prenom.trim()) return
-  store.addResident({ ...form.value })
-  showAddModal.value = false
-}
-
-// --- Modal suppression ---
-const showDeleteModal = ref(false)
-const toDelete = ref<Resident | null>(null)
-
-function confirmDelete(r: Resident) { toDelete.value = r; showDeleteModal.value = true }
-function cancelDelete() { showDeleteModal.value = false; toDelete.value = null }
-function executeDelete() { if (toDelete.value) store.removeResident(toDelete.value.id); cancelDelete() }
-
-// --- Initiales ---
-function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase() }
+const {
+  store,
+  viewMode,
+  selectedYear,
+  searchQuery,
+  showAddModal,
+  memberForm,
+  showPaymentModal,
+  selectedPaymentRow,
+  paymentForm,
+  showDeleteModal,
+  memberToDelete,
+  currentMonth,
+  monthlyStats,
+  annualStats,
+  filteredMembers,
+  monthlyRows,
+  annualMonths,
+  prevMonth,
+  nextMonth,
+  prevYear,
+  nextYear,
+  openAddMember,
+  closeAddMember,
+  submitAddMember,
+  openPayment,
+  closePayment,
+  submitPayment,
+  markRowAsPaid,
+  markRowAsUnpaid,
+  confirmDelete,
+  cancelDelete,
+  executeDelete,
+  memberInitials,
+  memberName,
+  formatCurrency,
+  statusLabel,
+  statusBadgeClass,
+  statusDotClass,
+  annualPaymentStatus,
+  annualAmountPaid,
+  annualCellTitle,
+  monthShortName,
+} = useDashboardViewModel()
 </script>
 
 <template>
-  <div class="flex h-screen bg-gray-50 overflow-hidden">
-
-    <!-- ===== SIDEBAR ===== -->
-    <aside class="w-60 bg-slate-900 flex flex-col shrink-0">
-      <!-- Logo -->
-      <div class="px-5 py-5 border-b border-slate-700/60">
+  <div class="flex h-screen flex-col overflow-hidden bg-gray-100 text-gray-900 md:flex-row">
+    <aside class="flex w-full shrink-0 flex-col border-r border-slate-800 bg-slate-950 md:w-64">
+      <div class="border-b border-slate-800 px-5 py-5">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <Building2 class="w-5 h-5 text-white" />
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
+            <Building2 class="h-5 w-5 text-white" />
           </div>
           <div>
-            <p class="text-white font-semibold text-sm leading-none">Foyer</p>
-            <p class="text-slate-400 text-xs mt-0.5">Gestion résidents</p>
+            <p class="text-sm font-semibold leading-none text-white">Foyer</p>
+            <p class="mt-1 text-xs text-slate-400">Suivi des cotisations</p>
           </div>
         </div>
       </div>
 
-      <!-- Navigation -->
-      <nav class="flex-1 px-3 py-5 space-y-1">
-        <p class="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Vues</p>
+      <nav class="flex flex-1 gap-2 overflow-x-auto px-3 py-4 md:block md:space-y-1 md:overflow-visible">
         <button
-          @click="viewMode = 'mensuelle'"
           :class="[
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-            viewMode === 'mensuelle'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            'flex min-w-max items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:w-full',
+            viewMode === 'monthly'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-white',
           ]"
+          @click="viewMode = 'monthly'"
         >
-          <CalendarDays class="w-4 h-4 shrink-0" />
-          Vue mensuelle
+          <CalendarDays class="h-4 w-4" />
+          Tableau de bord
         </button>
         <button
-          @click="viewMode = 'annuelle'"
           :class="[
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-            viewMode === 'annuelle'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            'flex min-w-max items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:w-full',
+            viewMode === 'annual'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-white',
           ]"
+          @click="viewMode = 'annual'"
         >
-          <BarChart3 class="w-4 h-4 shrink-0" />
+          <BarChart3 class="h-4 w-4" />
           Vue annuelle
         </button>
+        <div class="hidden border-t border-slate-800 pt-4 md:mt-4 md:block">
+          <div class="px-3 text-xs font-medium uppercase tracking-wide text-slate-500">Données</div>
+          <div class="mt-3 space-y-2 px-3 text-xs text-slate-400">
+            <p>{{ store.members.length }} membres</p>
+            <p>{{ store.months.length }} mois configurés</p>
+            <p>{{ store.payments.length }} paiements</p>
+          </div>
+        </div>
       </nav>
 
-      <!-- Utilisateur -->
-      <div class="px-3 py-4 border-t border-slate-700/60">
-        <div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 transition-colors group cursor-pointer">
-          <div class="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center shrink-0">
-            <span class="text-slate-300 text-xs font-semibold">A</span>
+      <div class="hidden border-t border-slate-800 px-3 py-4 md:block">
+        <div class="flex items-center gap-3 rounded-lg px-3 py-2">
+          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800">
+            <span class="text-xs font-semibold text-slate-300">A</span>
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-slate-200 text-sm font-medium truncate">Administrateur</p>
-            <p class="text-slate-500 text-xs truncate">Gestionnaire</p>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium text-slate-200">Administrateur</p>
+            <p class="truncate text-xs text-slate-500">Gestionnaire</p>
           </div>
-          <LogOut class="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
+          <LogOut class="h-4 w-4 text-slate-600" />
         </div>
       </div>
     </aside>
 
-    <!-- ===== MAIN ===== -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <header class="shrink-0 border-b border-gray-200 bg-white px-4 py-4 md:px-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 class="text-xl font-semibold text-gray-950">
+              {{ viewMode === 'monthly' ? 'Paiements mensuels' : 'Récapitulatif annuel' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">
+              {{ viewMode === 'monthly' ? currentMonth.name : selectedYear }}
+              · {{ store.members.length }} membre{{ store.members.length > 1 ? 's' : '' }}
+            </p>
+          </div>
 
-      <!-- Header -->
-      <header class="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 class="text-xl font-semibold text-gray-900">
-            {{ viewMode === 'mensuelle' ? 'Paiements mensuels' : 'Récapitulatif annuel' }}
-          </h1>
-          <p class="text-sm text-gray-400 mt-0.5">
-            {{ store.residents.length }} résident{{ store.residents.length !== 1 ? 's' : '' }}
-            enregistré{{ store.residents.length !== 1 ? 's' : '' }}
-          </p>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <!-- Navigateur mensuel -->
-          <template v-if="viewMode === 'mensuelle'">
-            <div class="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-              <button @click="prevMonth" class="px-2.5 py-2 hover:bg-gray-100 text-gray-500 transition-colors">
-                <ChevronLeft class="w-4 h-4" />
+          <div class="flex flex-wrap items-center gap-3">
+            <div
+              v-if="viewMode === 'monthly'"
+              class="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+            >
+              <button
+                class="px-3 py-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                type="button"
+                @click="prevMonth"
+              >
+                <ChevronLeft class="h-4 w-4" />
               </button>
-              <span class="px-3 text-sm font-medium text-gray-800 min-w-35 text-center">
-                {{ MOIS[selectedMonth - 1] }} {{ selectedYear }}
+              <span class="min-w-[10rem] px-3 text-center text-sm font-semibold text-gray-800">
+                {{ currentMonth.name }}
               </span>
-              <button @click="nextMonth" class="px-2.5 py-2 hover:bg-gray-100 text-gray-500 transition-colors">
-                <ChevronRight class="w-4 h-4" />
+              <button
+                class="px-3 py-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                type="button"
+                @click="nextMonth"
+              >
+                <ChevronRight class="h-4 w-4" />
               </button>
             </div>
-          </template>
 
-          <!-- Navigateur annuel -->
-          <template v-else>
-            <div class="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-              <button @click="prevYear" class="px-2.5 py-2 hover:bg-gray-100 text-gray-500 transition-colors">
-                <ChevronLeft class="w-4 h-4" />
+            <div
+              v-else
+              class="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+            >
+              <button
+                class="px-3 py-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                type="button"
+                @click="prevYear"
+              >
+                <ChevronLeft class="h-4 w-4" />
               </button>
-              <span class="px-3 text-sm font-medium text-gray-800 min-w-17.5 text-center">
+              <span class="min-w-[6rem] px-3 text-center text-sm font-semibold text-gray-800">
                 {{ selectedYear }}
               </span>
-              <button @click="nextYear" class="px-2.5 py-2 hover:bg-gray-100 text-gray-500 transition-colors">
-                <ChevronRight class="w-4 h-4" />
+              <button
+                class="px-3 py-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                type="button"
+                @click="nextYear"
+              >
+                <ChevronRight class="h-4 w-4" />
               </button>
             </div>
-          </template>
 
-          <!-- Bouton ajouter -->
-          <button
-            @click="openAdd"
-            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors shadow-sm"
-          >
-            <Plus class="w-4 h-4" />
-            Ajouter
-          </button>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              type="button"
+              @click="openAddMember"
+            >
+              <Plus class="h-4 w-4" />
+              Ajouter membre
+            </button>
+          </div>
         </div>
       </header>
 
-      <!-- Contenu défilant -->
-      <div class="flex-1 overflow-y-auto p-6">
-
-        <!-- ===== CARTES STATS ===== -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
-
-          <!-- Résidents -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Résidents</span>
-              <div class="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center">
-                <Users class="w-4 h-4 text-indigo-600" />
-              </div>
+      <div class="flex-1 overflow-y-auto p-4 md:p-6">
+        <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Membres</span>
+              <Users class="h-4 w-4 text-indigo-600" />
             </div>
-            <p class="text-3xl font-bold text-gray-900">
-              {{ viewMode === 'mensuelle' ? stats.totalResidents : annualStats.totalResidents }}
+            <p class="mt-3 text-2xl font-bold">
+              {{ viewMode === 'monthly' ? monthlyStats.totalMembers : annualStats.totalMembers }}
             </p>
-            <p class="text-xs text-gray-400 mt-1">au total</p>
+            <p class="mt-1 text-xs text-gray-500">inscrits dans le foyer</p>
           </div>
 
-          <!-- Payés -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                {{ viewMode === 'mensuelle' ? 'Payés' : 'Mensualités payées' }}
-              </span>
-              <div class="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
-                <CheckCircle class="w-4 h-4 text-green-600" />
-              </div>
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Payés</span>
+              <CheckCircle class="h-4 w-4 text-green-600" />
             </div>
-            <p class="text-3xl font-bold text-gray-900">
-              {{ viewMode === 'mensuelle' ? stats.payes : annualStats.totalPaidSlots }}
+            <p class="mt-3 text-2xl font-bold">
+              {{ viewMode === 'monthly' ? monthlyStats.paidCount : annualStats.paidSlots }}
             </p>
-            <p class="text-xs text-gray-400 mt-1">
-              {{ viewMode === 'mensuelle' ? `sur ${stats.totalResidents}` : `sur l'année` }}
+            <p class="mt-1 text-xs text-gray-500">
+              {{ viewMode === 'monthly' ? 'paiements reçus' : 'mensualités reçues' }}
             </p>
           </div>
 
-          <!-- En retard -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">En retard</span>
-              <div class="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
-                <AlertCircle class="w-4 h-4 text-red-500" />
-              </div>
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Impayés</span>
+              <AlertCircle class="h-4 w-4 text-red-500" />
             </div>
-            <p class="text-3xl font-bold text-gray-900">
-              {{ viewMode === 'mensuelle' ? stats.retards : annualStats.totalLateSlots }}
+            <p class="mt-3 text-2xl font-bold">
+              {{ viewMode === 'monthly' ? monthlyStats.unpaidCount : annualStats.unpaidSlots }}
             </p>
-            <p v-if="(viewMode === 'mensuelle' ? stats.retards : annualStats.totalLateSlots) > 0" class="text-xs text-red-400 mt-1 font-medium">
-              Action requise
+            <p class="mt-1 text-xs text-gray-500">
+              {{ viewMode === 'monthly' ? `${monthlyStats.lateCount} en retard` : `${annualStats.lateSlots} retards` }}
             </p>
-            <p v-else class="text-xs text-gray-400 mt-1">Tout est à jour</p>
           </div>
 
-          <!-- Total collecté -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                {{ viewMode === 'mensuelle' ? 'Collecté' : 'Total annuel' }}
-              </span>
-              <div class="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <TrendingUp class="w-4 h-4 text-emerald-600" />
-              </div>
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Collecté</span>
+              <WalletCards class="h-4 w-4 text-emerald-600" />
             </div>
-            <p class="text-3xl font-bold text-gray-900">
-              {{ viewMode === 'mensuelle' ? stats.totalCollecte : annualStats.totalCollecte }}
-              <span class="text-lg font-semibold text-gray-400">€</span>
+            <p class="mt-3 text-2xl font-bold">
+              {{ formatCurrency(viewMode === 'monthly' ? monthlyStats.collectedAmount : annualStats.collectedAmount) }}
             </p>
-            <p class="text-xs text-gray-400 mt-1">
-              {{ viewMode === 'mensuelle' ? `sur ${stats.totalAttendu} € attendus` : `encaissés en ${selectedYear}` }}
+            <p class="mt-1 text-xs text-gray-500">
+              sur
+              {{ formatCurrency(viewMode === 'monthly' ? monthlyStats.expectedAmount : annualStats.expectedAmount) }}
             </p>
           </div>
-        </div>
+        </section>
 
-        <!-- ===== TABLEAU ===== -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <section class="mt-5 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-gray-900">
+                {{ viewMode === 'monthly' ? currentMonth.name : `Paiements ${selectedYear}` }}
+              </h2>
+              <p class="mt-1 text-xs text-gray-500">
+                Montant mensuel attendu:
+                {{ formatCurrency(viewMode === 'monthly' ? currentMonth.amount : annualStats.expectedAmount) }}
+              </p>
+            </div>
 
-          <!-- En-tête tableau -->
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 class="font-semibold text-gray-800 text-sm">
-              {{
-                viewMode === 'mensuelle'
-                  ? `${MOIS[selectedMonth - 1]} ${selectedYear}`
-                  : `Récapitulatif ${selectedYear}`
-              }}
-            </h2>
-            <div class="relative">
-              <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <div class="relative w-full lg:w-72">
+              <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 v-model="searchQuery"
-                placeholder="Rechercher…"
-                class="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-44"
+                class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                placeholder="Rechercher nom ou téléphone"
               />
             </div>
           </div>
 
-          <!-- ===== VUE MENSUELLE ===== -->
-          <template v-if="viewMode === 'mensuelle'">
-            <table class="w-full">
-              <thead>
-                <tr class="bg-gray-50/70">
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Résident</th>
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Cotisation</th>
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Statut</th>
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Payé le</th>
-                  <th class="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-50">
-                <tr
-                  v-for="resident in filteredResidents"
-                  :key="resident.id"
-                  class="hover:bg-gray-50/60 transition-colors"
-                >
-                  <td class="px-5 py-4">
-                    <div class="flex items-center gap-3">
-                      <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                        <span class="text-indigo-700 text-xs font-bold">{{ initiales(resident) }}</span>
-                      </div>
-                      <div>
-                        <p class="text-sm font-semibold text-gray-900">{{ resident.prenom }} {{ resident.nom }}</p>
-                        <p class="text-xs text-gray-400">Depuis le {{ resident.dateEntree }}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-5 py-4">
-                    <span class="text-sm font-semibold text-gray-900">{{ resident.cotisation }} €</span>
-                  </td>
-                  <td class="px-5 py-4">
-                    <span
-                      :class="[
-                        'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ring-inset',
-                        statutBadgeClass(store.getStatutMois(resident.id, selectedYear, selectedMonth))
-                      ]"
-                    >
-                      {{ statutLabel(store.getStatutMois(resident.id, selectedYear, selectedMonth)) }}
-                    </span>
-                  </td>
-                  <td class="px-5 py-4">
-                    <span class="text-sm text-gray-400">
-                      {{ store.getPaiement(resident.id, selectedYear, selectedMonth)?.datePaiement ?? '—' }}
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-right">
-                    <div class="flex items-center justify-end gap-2">
-                      <button
-                        v-if="store.getStatutMois(resident.id, selectedYear, selectedMonth) !== 'payé'"
-                        @click="store.marquerCommePaye(resident.id, selectedYear, selectedMonth)"
-                        class="text-xs font-semibold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-2.5 py-1 rounded-lg transition-colors"
-                      >
-                        Marquer payé
-                      </button>
-                      <button
-                        @click="confirmDelete(resident)"
-                        class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 class="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="filteredResidents.length === 0">
-                  <td colspan="5" class="px-5 py-16 text-center text-gray-400 text-sm">
-                    Aucun résident trouvé
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </template>
-
-          <!-- ===== VUE ANNUELLE ===== -->
-          <template v-else>
+          <template v-if="viewMode === 'monthly'">
             <div class="overflow-x-auto">
-              <table class="w-full">
+              <table class="w-full min-w-[980px]">
                 <thead>
-                  <tr class="bg-gray-50/70">
-                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide sticky left-0 bg-gray-50/70 min-w-45">
-                      Résident
-                    </th>
-                    <th
-                      v-for="m in annualMonths"
-                      :key="m"
-                      class="px-1 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide min-w-11.5"
-                    >
-                      {{ MOIS_COURT[m - 1] }}
-                    </th>
-                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Total</th>
-                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+                  <tr class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th class="px-4 py-3">Membre</th>
+                    <th class="px-4 py-3">Téléphone</th>
+                    <th class="px-4 py-3 text-right">Attendu</th>
+                    <th class="px-4 py-3 text-right">Payé</th>
+                    <th class="px-4 py-3">Statut</th>
+                    <th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Note</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-50">
-                  <tr
-                    v-for="resident in filteredResidents"
-                    :key="resident.id"
-                    class="hover:bg-gray-50/60 transition-colors"
-                  >
-                    <td class="px-5 py-3.5 sticky left-0 bg-white">
-                      <div class="flex items-center gap-2.5">
-                        <div class="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                          <span class="text-indigo-700 text-xs font-bold">{{ initiales(resident) }}</span>
+                <tbody class="divide-y divide-gray-100">
+                  <tr v-for="row in monthlyRows" :key="row.member.id" class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50">
+                          <span class="text-xs font-bold text-indigo-700">{{ memberInitials(row.member) }}</span>
                         </div>
-                        <span class="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                          {{ resident.prenom }} {{ resident.nom }}
-                        </span>
+                        <div>
+                          <p class="text-sm font-semibold text-gray-950">{{ memberName(row.member) }}</p>
+                          <p class="text-xs text-gray-500">Créé le {{ row.member.createdAt.slice(0, 10) }}</p>
+                        </div>
                       </div>
                     </td>
-                    <td v-for="m in annualMonths" :key="m" class="px-1 py-3.5 text-center">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2 text-sm text-gray-700">
+                        <Phone class="h-3.5 w-3.5 text-gray-400" />
+                        {{ row.member.phone }}
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-semibold">
+                      {{ formatCurrency(row.expectedAmount) }}
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-semibold">
+                      {{ formatCurrency(row.amountPaid) }}
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="[
+                          'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+                          statusBadgeClass(row.status),
+                        ]"
+                      >
+                        {{ statusLabel(row.status) }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600">{{ row.paidAt ?? '-' }}</td>
+                    <td class="max-w-56 px-4 py-3 text-sm text-gray-600">
+                      <span class="line-clamp-1">{{ row.note || '-' }}</span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center justify-end gap-2">
+                        <button
+                          v-if="row.status !== 'paid'"
+                          class="rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
+                          type="button"
+                          @click="markRowAsPaid(row)"
+                        >
+                          Marquer payé
+                        </button>
+                        <button
+                          v-else
+                          class="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                          type="button"
+                          @click="markRowAsUnpaid(row)"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                          title="Modifier le paiement"
+                          type="button"
+                          @click="openPayment(row)"
+                        >
+                          <Edit3 class="h-4 w-4" />
+                        </button>
+                        <button
+                          class="rounded-lg p-2 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                          title="Supprimer le membre"
+                          type="button"
+                          @click="confirmDelete(row.member)"
+                        >
+                          <Trash2 class="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="monthlyRows.length === 0">
+                    <td colspan="8" class="px-4 py-16 text-center text-sm text-gray-500">
+                      Aucun membre trouvé.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[920px]">
+                <thead>
+                  <tr class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th class="sticky left-0 bg-gray-50 px-4 py-3">Membre</th>
+                    <th
+                      v-for="month in annualMonths"
+                      :key="month.id"
+                      class="px-2 py-3 text-center"
+                    >
+                      {{ monthShortName(month) }}
+                    </th>
+                    <th class="px-4 py-3 text-right">Total payé</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <tr v-for="member in filteredMembers" :key="member.id" class="hover:bg-gray-50">
+                    <td class="sticky left-0 bg-white px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50">
+                          <span class="text-xs font-bold text-indigo-700">{{ memberInitials(member) }}</span>
+                        </div>
+                        <div>
+                          <p class="whitespace-nowrap text-sm font-semibold text-gray-950">
+                            {{ memberName(member) }}
+                          </p>
+                          <p class="whitespace-nowrap text-xs text-gray-500">{{ member.phone }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td v-for="month in annualMonths" :key="month.id" class="px-2 py-3 text-center">
                       <div class="flex justify-center">
                         <div
-                          :class="['w-5 h-5 rounded-full cursor-help transition-transform hover:scale-125', cellDotClass(resident.id, m)]"
-                          :title="cellTitle(resident.id, m)"
+                          :class="[
+                            'h-4 w-4 rounded-full ring-2 ring-white',
+                            statusDotClass(annualPaymentStatus(member.id, month)),
+                          ]"
+                          :title="annualCellTitle(member, month)"
                         />
                       </div>
                     </td>
-                    <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                      <span class="text-sm font-bold text-gray-900">{{ totalPayeAnnee(resident.id) }} €</span>
+                    <td class="px-4 py-3 text-right text-sm font-bold">
+                      {{ formatCurrency(annualAmountPaid(member.id)) }}
                     </td>
-                    <td class="px-5 py-3.5 text-right">
+                    <td class="px-4 py-3 text-right">
                       <button
-                        @click="confirmDelete(resident)"
-                        class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        class="rounded-lg p-2 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                        title="Supprimer le membre"
+                        type="button"
+                        @click="confirmDelete(member)"
                       >
-                        <Trash2 class="w-3.5 h-3.5" />
+                        <Trash2 class="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
-                  <tr v-if="filteredResidents.length === 0">
-                    <td :colspan="annualMonths.length + 3" class="px-5 py-16 text-center text-gray-400 text-sm">
-                      Aucun résident trouvé
+                  <tr v-if="filteredMembers.length === 0">
+                    <td :colspan="annualMonths.length + 3" class="px-4 py-16 text-center text-sm text-gray-500">
+                      Aucun membre trouvé.
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- Légende -->
-            <div class="px-5 py-3 border-t border-gray-100 flex items-center gap-6 text-xs text-gray-400">
-              <span class="font-semibold text-gray-500">Légende</span>
-              <div class="flex items-center gap-1.5">
-                <div class="w-3 h-3 rounded-full bg-green-500" />
-                Payé
-              </div>
-              <div class="flex items-center gap-1.5">
-                <div class="w-3 h-3 rounded-full bg-amber-400" />
-                En attente
-              </div>
-              <div class="flex items-center gap-1.5">
-                <div class="w-3 h-3 rounded-full bg-red-500" />
-                En retard
-              </div>
+            <div class="flex flex-wrap items-center gap-5 border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
+              <span class="font-semibold text-gray-700">Légende</span>
+              <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-green-500" />Payé</span>
+              <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-amber-400" />En attente</span>
+              <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-red-500" />En retard</span>
             </div>
           </template>
-        </div>
+        </section>
       </div>
     </main>
 
-    <!-- ===== MODAL AJOUT RÉSIDENT ===== -->
     <Teleport to="body">
       <Transition name="fade">
         <div
           v-if="showAddModal"
-          class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          @click.self="showAddModal = false"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          @click.self="closeAddMember"
         >
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-              <h2 class="text-lg font-semibold text-gray-900">Ajouter un résident</h2>
-              <button @click="showAddModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                <X class="w-5 h-5" />
+          <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h2 class="text-base font-semibold text-gray-950">Ajouter un membre</h2>
+              <button
+                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                type="button"
+                @click="closeAddMember"
+              >
+                <X class="h-5 w-5" />
               </button>
             </div>
-            <div class="px-6 py-5 space-y-4">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Prénom <span class="text-red-400">*</span>
-                  </label>
+            <div class="space-y-4 px-5 py-5">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="text-sm font-medium text-gray-700">Prénom</span>
                   <input
-                    v-model="form.prenom"
-                    type="text"
+                    v-model="memberForm.firstName"
+                    class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     placeholder="Jean"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Nom <span class="text-red-400">*</span>
-                  </label>
+                </label>
+                <label class="block">
+                  <span class="text-sm font-medium text-gray-700">Nom</span>
                   <input
-                    v-model="form.nom"
-                    type="text"
-                    placeholder="Dupont"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    v-model="memberForm.lastName"
+                    class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    placeholder="Rakoto"
                   />
-                </div>
+                </label>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Date d'entrée</label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Téléphone</span>
                 <input
-                  v-model="form.dateEntree"
-                  type="date"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  v-model="memberForm.phone"
+                  class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  placeholder="+261 34 12 345 67"
                 />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Cotisation mensuelle (€)</label>
-                <input
-                  v-model.number="form.cotisation"
-                  type="number"
-                  min="0"
-                  step="10"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
+              </label>
             </div>
-            <div class="px-6 pb-6 flex items-center justify-end gap-3">
+            <div class="flex justify-end gap-3 px-5 pb-5">
               <button
-                @click="showAddModal = false"
-                class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+                class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                type="button"
+                @click="closeAddMember"
               >
                 Annuler
               </button>
               <button
-                @click="submitAdd"
-                :disabled="!form.nom.trim() || !form.prenom.trim()"
-                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors"
+                :disabled="!memberForm.firstName.trim() || !memberForm.lastName.trim() || !memberForm.phone.trim()"
+                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                type="button"
+                @click="submitAddMember"
               >
-                Ajouter le résident
+                Ajouter
               </button>
             </div>
           </div>
@@ -561,36 +523,122 @@ function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase
       </Transition>
     </Teleport>
 
-    <!-- ===== MODAL SUPPRESSION ===== -->
     <Teleport to="body">
       <Transition name="fade">
         <div
-          v-if="showDeleteModal"
-          class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          @click.self="cancelDelete"
+          v-if="showPaymentModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          @click.self="closePayment"
         >
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            <div class="p-6 text-center">
-              <div class="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Trash2 class="w-6 h-6 text-red-500" />
+          <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div>
+                <h2 class="text-base font-semibold text-gray-950">Modifier le paiement</h2>
+                <p class="mt-1 text-xs text-gray-500">
+                  {{ selectedPaymentRow ? memberName(selectedPaymentRow.member) : '' }}
+                  · {{ selectedPaymentRow?.month.name }}
+                </p>
               </div>
-              <h2 class="text-lg font-semibold text-gray-900 mb-2">Supprimer le résident ?</h2>
-              <p class="text-sm text-gray-500 leading-relaxed">
-                Vous allez supprimer
-                <span class="font-semibold text-gray-800">{{ toDelete?.prenom }} {{ toDelete?.nom }}</span>
-                ainsi que tous ses enregistrements de paiement. Cette action est irréversible.
-              </p>
-            </div>
-            <div class="px-6 pb-6 flex items-center gap-3">
               <button
-                @click="cancelDelete"
-                class="flex-1 px-4 py-2.5 border border-gray-200 text-sm text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                type="button"
+                @click="closePayment"
+              >
+                <X class="h-5 w-5" />
+              </button>
+            </div>
+            <div class="space-y-4 px-5 py-5">
+              <label class="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <input v-model="paymentForm.isPaid" class="h-4 w-4 accent-indigo-600" type="checkbox" />
+                <span class="text-sm font-medium text-gray-800">Paiement reçu</span>
+              </label>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="text-sm font-medium text-gray-700">Montant payé (Ar)</span>
+                  <input
+                    v-model.number="paymentForm.amountPaid"
+                    :disabled="!paymentForm.isPaid"
+                    class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-100 disabled:text-gray-400"
+                    min="0"
+                    step="1000"
+                    type="number"
+                  />
+                </label>
+                <label class="block">
+                  <span class="text-sm font-medium text-gray-700">Payé le</span>
+                  <input
+                    v-model="paymentForm.paidAt"
+                    :disabled="!paymentForm.isPaid"
+                    class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-100 disabled:text-gray-400"
+                    type="date"
+                  />
+                </label>
+              </div>
+
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Note</span>
+                <textarea
+                  v-model="paymentForm.note"
+                  class="mt-1 min-h-24 w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  placeholder="Référence, commentaire, rappel..."
+                />
+              </label>
+            </div>
+            <div class="flex justify-end gap-3 px-5 pb-5">
+              <button
+                class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                type="button"
+                @click="closePayment"
               >
                 Annuler
               </button>
               <button
+                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                type="button"
+                @click="submitPayment"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showDeleteModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          @click.self="cancelDelete"
+        >
+          <div class="w-full max-w-sm rounded-lg bg-white shadow-xl">
+            <div class="px-5 py-5 text-center">
+              <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-red-50">
+                <Trash2 class="h-5 w-5 text-red-600" />
+              </div>
+              <h2 class="text-base font-semibold text-gray-950">Supprimer le membre ?</h2>
+              <p class="mt-2 text-sm leading-relaxed text-gray-500">
+                Cette action supprimera
+                <span class="font-semibold text-gray-800">
+                  {{ memberToDelete ? memberName(memberToDelete) : '' }}
+                </span>
+                et ses paiements mockés.
+              </p>
+            </div>
+            <div class="flex gap-3 px-5 pb-5">
+              <button
+                class="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                type="button"
+                @click="cancelDelete"
+              >
+                Annuler
+              </button>
+              <button
+                class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                type="button"
                 @click="executeDelete"
-                class="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 Supprimer
               </button>
@@ -599,7 +647,6 @@ function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase
         </div>
       </Transition>
     </Teleport>
-
   </div>
 </template>
 
@@ -608,6 +655,7 @@ function initiales(r: Resident) { return `${r.prenom[0]}${r.nom[0]}`.toUpperCase
 .fade-leave-active {
   transition: opacity 0.15s ease;
 }
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
