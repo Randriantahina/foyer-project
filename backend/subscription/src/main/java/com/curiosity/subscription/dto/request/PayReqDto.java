@@ -1,6 +1,7 @@
 package com.curiosity.subscription.dto.request;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,14 +9,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
-public class MemberReqDto {
-	private String firstName;
-	private String lastName;
-	private String phoneNumber;
-	private LocalDateTime payedAt;
+public class PayReqDto {
+	private BigDecimal amountPaid;
+	private String note;
 	
-
 }

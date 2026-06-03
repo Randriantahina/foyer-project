@@ -1,10 +1,9 @@
-package com.curiosity.subscription.Service;
+package com.curiosity.subscription.service;
 
 import java.util.List;
 
 import com.curiosity.subscription.exception.MemberNotFoundException;
 import com.curiosity.subscription.model.Member;
-
 
 public interface MemberService {
 	Member addNewMember(Member newMember);
@@ -14,6 +13,8 @@ public interface MemberService {
 	List<Member> findAllMember();
 	
 	Member updateMember(Member member) throws MemberNotFoundException;
+	
+	List<Member> memberUnpaid(int month, int year);
 
 
 	void deleteMember(Long idMember) ;

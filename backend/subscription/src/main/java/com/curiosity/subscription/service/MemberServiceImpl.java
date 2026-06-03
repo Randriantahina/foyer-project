@@ -1,4 +1,4 @@
-package com.curiosity.subscription.Service;
+package com.curiosity.subscription.service;
 
 import java.util.List;
 
@@ -57,6 +57,13 @@ public class MemberServiceImpl implements MemberService {
 	public void deleteManyMember(List<Long> idmembers) {
 		memberRepo.deleteAllById(idmembers);
 		
+	}
+
+	//use inside the pay to give the member unpaid for a month and year specific
+	@Override
+	public List<Member> memberUnpaid(int month, int year) {
+				List<Member> members= memberRepo.subscrUnpaidMember(month, year);
+				return members;
 	}
 
 }

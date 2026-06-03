@@ -1,7 +1,9 @@
 package com.curiosity.subscription.model;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.CreationTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,7 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -19,14 +23,17 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@Builder
+
 public class Pay {
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
-	private long id;
+	private Long id;
 	
 	private boolean isPaid;
 	@Column(name="paid_at")
-	private Timestamp paidAt;
+	@CreationTimestamp
+	private LocalDateTime payedAt;
 	@Lob
 	private String note;
 	@Column(name="amount_paid")
@@ -37,6 +44,6 @@ public class Pay {
 	private Member member;
 	
 	@ManyToOne()
-	@JoinColumn(name="subscription_per_month_id")
-	private SubscriptionPerMonth subscription ;
+	@JoinColumn(name="subscription_id")
+	private Subscription subscription ;
 }

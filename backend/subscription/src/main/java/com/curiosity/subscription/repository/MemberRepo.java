@@ -15,4 +15,26 @@ public interface MemberRepo  extends JpaRepository<Member, Long>{
 			value="SELECT * FROM subscription_db.member WHERE first_name LIKE CONCAT('%', :name, '%') OR last_name LIKE CONCAT('%',:name,'%')"
 	)
 	List<Member> findByName(@Param(value = "name") String name);
+	
+	@Query(
+			nativeQuery=true,
+			value="""
+						SELECT m.*
+						FROM member m
+						WHERE NOT EXISTS (
+						    SELECT 1
+						    FROM pay p
+						    JOIN subscription s
+						        ON p.subscription_id = s.id
+						    WHERE p.member_id = m.id
+						      AND s.month =:month
+						      AND s.year =:year
+						);						
+
+					"""
+		)
+		List<Member> subscrUnpaidMember(
+				@Param(value="month") int month,
+				@Param(value="year") int year
+		);
 }
