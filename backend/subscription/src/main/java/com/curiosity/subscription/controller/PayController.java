@@ -30,39 +30,42 @@ import com.curiosity.subscription.service.MemberService;
 import com.curiosity.subscription.service.PayService;
 import com.curiosity.subscription.service.SubscriptionService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/{version}/pays")
 @RequiredArgsConstructor
 @CrossOrigin
+@Tag(name = "Payments", description = "Gestion des paiements")
 public class PayController {
 	private final PayService payService;
 	private final PayMapper payMapper;
-	
+
 	private final MemberService memberService;
 	private final MemberMapper memberMapper;
-	
+
 	private final SubscriptionService subscrpService;
 	private final SubscriptionMapper subscrpMapper;
-	
-	
+
+
+	@Operation(summary = "Enregistrer le paiement d'un membre pour un abonnement")
 	@PostMapping("/{idMember}/members/{idSubscrp}/subscriptions")
 	ResponseEntity<ApiResponse<PayRespDto>> memberPaySubscrp(
-			@PathVariable("idMember") Long idMember, 
-			@PathVariable("idSubscrp" )Long idSubscrp, 
+			@PathVariable("idMember") Long idMember,
+			@PathVariable("idSubscrp" )Long idSubscrp,
 			@RequestBody PayReqDto payReq
 	) {
-		
 		Pay pay = payService.memberPaySubscription(
-					idMember, 
+					idMember,
 					idSubscrp,
-					payReq.getAmountPaid(), 
+					payReq.getAmountPaid(),
 					payReq.getNote()
 				);
-		
+
 		PayRespDto payResp = payMapper.PayToDto(pay);
-		
+
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(
 						ApiResponse.<PayRespDto>builder()
@@ -72,20 +75,19 @@ public class PayController {
 							.build()
 				);
 	}
-	
-	
+
+	@Operation(summary = "Lister les paiements par mois et année")
 	@GetMapping("/subscriptions")
-	 ResponseEntity<ApiResponse<List<PayRespDto>>> getMemberPayMonth(
-			 @RequestParam(name="month")int month,
-			 @RequestParam(name="year") int year
+	ResponseEntity<ApiResponse<List<PayRespDto>>> getMemberPayMonth(
+			@RequestParam(name="month")int month,
+			@RequestParam(name="year") int year
 	){
 		List<Pay> pays = payService.payForMonthYear(month, year);
-		
+
 		List<PayRespDto> payResp = pays.stream()
 							.map(payMapper::PayToDto)
 							.toList();
-		
-		
+
 		return ResponseEntity.status(HttpStatus.OK)
 				.body(
 						ApiResponse.<List<PayRespDto>>builder()
@@ -95,9 +97,10 @@ public class PayController {
 							.build()
 				);
 	}
-	
+
+	@Operation(summary = "Lister les abonnements non payés d'un membre")
 	@GetMapping("/{id}/unpaid-subscriptions")
-	 ResponseEntity<ApiResponse<List<PayRespDto>>> getMemberUnPaidMonth(
+	ResponseEntity<ApiResponse<List<PayRespDto>>> getMemberUnPaidMonth(
 			@PathVariable("id") Long idSubscrp
 	){
 		Subscription subscrp = subscrpService.findSubscriptionById(idSubscrp);
@@ -105,10 +108,9 @@ public class PayController {
 							subscrp.getMonth(),
 							subscrp.getYear()
 		);
-		
-		
+
 		List<PayRespDto> unpayResps = new ArrayList<>();
-		
+
 		memberUnpaid.forEach((member) -> {
 			unpayResps.add(PayRespDto.builder()
 				.amountPaid(null)
@@ -119,8 +121,7 @@ public class PayController {
 				.build()
 				);
 			});
-		
-		
+
 		return ResponseEntity.status(HttpStatus.OK)
 				.body(
 						ApiResponse.<List<PayRespDto>>builder()
@@ -130,25 +131,26 @@ public class PayController {
 							.build()
 				);
 	}
-	
+
+	@Operation(summary = "Mettre à jour un paiement")
 	@PutMapping("/{idPay}")
 	ResponseEntity<ApiResponse<PayRespDto>> putPay(
 			@PathVariable("idPay") Long idPay,
-			@RequestParam(name="idMember",required=false) Long idMember, 
-			@RequestParam(name="idSubscrp", required=false )Long idSubscrp, 
+			@RequestParam(name="idMember",required=false) Long idMember,
+			@RequestParam(name="idSubscrp", required=false )Long idSubscrp,
 			@RequestBody PayReqDto payReq
 	) throws Exception{
 		Pay pay = payService.findPayById(idSubscrp);
-		
+
 		Member member = pay.getMember();
 		Subscription subscrp = pay.getSubscription();
-		
+
 		if(idMember != null)
 			 member = memberService.findAnyMemberById(idMember);
-		
+
 		if(idSubscrp != null)
 			 subscrp = subscrpService.findSubscriptionById(idSubscrp);
-		
+
 		Pay ModifiedPay = Pay.builder()
 								.id(pay.getId())
 								.amountPaid(payReq.getAmountPaid())
@@ -156,10 +158,9 @@ public class PayController {
 								.member(member)
 								.subscription(subscrp)
 								.build();
-		
+
 		PayRespDto data = payMapper.PayToDto(payService.updateExistingPay(ModifiedPay));
-		
-		
+
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(
 						ApiResponse.<PayRespDto>builder()
@@ -168,10 +169,5 @@ public class PayController {
 							.data(data)
 							.build()
 				);
-		
 	}
-	
-
-	
-	
 }

@@ -23,16 +23,20 @@ import com.curiosity.subscription.mapper.SubscriptionMapper;
 import com.curiosity.subscription.model.Subscription;
 import com.curiosity.subscription.service.SubscriptionService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("api/{version}/subscriptions")
 @RequiredArgsConstructor
 @CrossOrigin
+@Tag(name = "Subscriptions", description = "Gestion des abonnements")
 public class SubscriptionController {
 	private final SubscriptionService subscriptionService;
 	private final  SubscriptionMapper subscriptionMapper;
-	
+
+	@Operation(summary = "Créer un abonnement")
 	@PostMapping
 	ResponseEntity<ApiResponse<SubscriptionRespDto>> createSubscription(
 			@RequestBody SubscriptionReqDto subscReq
@@ -48,7 +52,8 @@ public class SubscriptionController {
 					.build()
 				);
 	}
-	
+
+	@Operation(summary = "Lister les abonnements disponibles")
 	@GetMapping
 	ResponseEntity<ApiResponse<List<SubscriptionRespDto>>> getAvailablesSubscription(){
 		List<Subscription>subscriptionAvailable =subscriptionService.subcriptionAvailable();
@@ -57,7 +62,7 @@ public class SubscriptionController {
 					subscr -> subscriptionMapper.subscriptionToDto(subscr)
 			)
 			.toList();
-			
+
 		return  ResponseEntity.ok(
 					ApiResponse.<List<SubscriptionRespDto>>builder()
 					.success(true)
@@ -65,8 +70,9 @@ public class SubscriptionController {
 					.data(data)
 					.build()
 				);
-	
 	}
+
+	@Operation(summary = "Trouver un abonnement par ID")
 	@GetMapping("/{id})")
 	ResponseEntity<ApiResponse<SubscriptionRespDto>> getSubsriptionById(
 			@PathVariable("id") Long idSubscrp
@@ -81,8 +87,8 @@ public class SubscriptionController {
 					.build()
 				);
 	}
-	//Filtering by month and year
-	//like  ?month=1&?year=2025
+
+	@Operation(summary = "Filtrer les abonnements par mois et année")
 	@GetMapping("?month={month}&year={year}")
 	ResponseEntity<ApiResponse<List<SubscriptionRespDto>>> getAboutSubscription(
 			@RequestParam int month,
@@ -94,7 +100,7 @@ public class SubscriptionController {
 						subscr -> subscriptionMapper.subscriptionToDto(subscr)
 				)
 				.toList();
-		
+
 		return ResponseEntity.ok(
 				ApiResponse.<List<SubscriptionRespDto>>builder()
 				.success(true)
@@ -102,37 +108,31 @@ public class SubscriptionController {
 				.data(data)
 				.build()
 		);
-				
 	}
-	
+
+	@Operation(summary = "Mettre à jour un abonnement")
 	@PutMapping("/{id}")
 	ResponseEntity<ApiResponse<SubscriptionRespDto>> updateSubscription(
 			@PathVariable Long id,
 			@RequestBody SubscriptionReqDto subscription
 	){
-		//before pass the subscriptionReqDto in the update service 
-		//we call the subcrtiption Mapper inside for converting the subscriptionRequest
 		Subscription modifiedSubscr = subscriptionService.updateSubscription(subscriptionMapper.dtoToSubscription(subscription));
 		return ResponseEntity.ok(
 				ApiResponse.<SubscriptionRespDto>builder()
 				.success(true)
 				.message("Subscription updat is Successful")
 				.data(
-						//convert the subscrtipn to subscriptionRespDto
 						subscriptionMapper.subscriptionToDto(modifiedSubscr)
-						
 				)
 				.build()
 				);
 	}
-	
+
+	@Operation(summary = "Supprimer un abonnement")
 	@DeleteMapping("/{idSubscr}")
 	ResponseEntity<ApiResponse<Void>> deleteSubscripton(@PathVariable("idSubscr") Long idSubscr){
 		subscriptionService.removeSubscription(idSubscr);
 		return ResponseEntity.noContent()
 				.build();
-		
 	}
-	
-	
 }

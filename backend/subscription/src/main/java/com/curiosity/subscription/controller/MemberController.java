@@ -23,16 +23,20 @@ import com.curiosity.subscription.exception.MemberNotFoundException;
 import com.curiosity.subscription.mapper.MemberMapper;
 import com.curiosity.subscription.model.Member;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/{version}/members")
 @RequiredArgsConstructor
 @CrossOrigin
+@Tag(name = "Members", description = "Gestion des membres")
 public class MemberController {
 	private final MemberService memberService;
 	private final MemberMapper memberMapper;
-	
+
+	@Operation(summary = "Créer un membre")
 	@PostMapping
 	ResponseEntity<ApiResponse<MemberRespDto>> saveMember(@RequestBody MemberReqDto memberReqDto) {
 		Member newOne = memberMapper.memberDtoMember(memberReqDto) ;
@@ -43,12 +47,12 @@ public class MemberController {
 				.message("Adding member Successful")
 				.data(data)
 				.build()
-				
 				);
 	}
-	
+
+	@Operation(summary = "Trouver un membre par ID")
 	@GetMapping("/{id}")
-	ResponseEntity<ApiResponse<MemberRespDto>> getMemberById(@PathVariable Long id) throws  MemberNotFoundException{
+	ResponseEntity<ApiResponse<MemberRespDto>> getMemberById(@PathVariable Long id) throws MemberNotFoundException {
 		Member member = memberService.findAnyMemberById(id);
 		return ResponseEntity.ok(
 				ApiResponse.<MemberRespDto>builder()
@@ -56,58 +60,57 @@ public class MemberController {
 				.message("Adding member Successful")
 				.data(memberMapper.memberToDto(member))
 				.build()
-				
 				);
 	}
 
-	//filtering by a member's name 
+	@Operation(summary = "Rechercher des membres par nom")
 	@GetMapping("?name={name}")
-	ResponseEntity<ApiResponse<List<MemberRespDto>>> getMemberByName(@RequestParam String name){
-		List<MemberRespDto> listMemberMatchName =memberService.findMemberByName(name)
+	ResponseEntity<ApiResponse<List<MemberRespDto>>> getMemberByName(@RequestParam String name) {
+		List<MemberRespDto> listMemberMatchName = memberService.findMemberByName(name)
 				.stream()
-				.map(member ->  memberMapper.memberToDto(member))
+				.map(member -> memberMapper.memberToDto(member))
 				.toList();
-		
-		return  ResponseEntity.ok(
+
+		return ResponseEntity.ok(
 				ApiResponse.<List<MemberRespDto>>builder()
 				.success(true)
 				.message("Adding member Successful")
 				.data(listMemberMatchName)
 				.build()
-				
 				);
 	}
-	
-	
+
+	@Operation(summary = "Lister tous les membres")
 	@GetMapping
-	ResponseEntity<ApiResponse<List<MemberRespDto>>> getAllMember(){
-		List<MemberRespDto> listAllMember =memberService.findAllMember()
+	ResponseEntity<ApiResponse<List<MemberRespDto>>> getAllMember() {
+		List<MemberRespDto> listAllMember = memberService.findAllMember()
 				.stream()
-				.map(member ->  memberMapper.memberToDto(member))
+				.map(member -> memberMapper.memberToDto(member))
 				.toList();
-		
-		return  ResponseEntity.ok(
+
+		return ResponseEntity.ok(
 				ApiResponse.<List<MemberRespDto>>builder()
 				.success(true)
 				.message("Adding member Successful")
 				.data(listAllMember)
 				.build()
-				
 				);
 	}
-	
+
+	@Operation(summary = "Mettre à jour un membre")
 	@PutMapping
 	ResponseEntity<ApiResponse<MemberRespDto>> putMember(@RequestBody Member member) throws Exception {
 		MemberRespDto memberUpdate = memberMapper.memberToDto(memberService.updateMember(member));
 		return ResponseEntity.ok(
-					ApiResponse.<MemberRespDto>builder()
-					.success(true)
-					.message("Updating member Succesful")
-					.data(memberUpdate)
-					.build()
+				ApiResponse.<MemberRespDto>builder()
+				.success(true)
+				.message("Updating member Succesful")
+				.data(memberUpdate)
+				.build()
 				);
 	}
-	
+
+	@Operation(summary = "Supprimer un membre par ID")
 	@DeleteMapping("/{id}")
 	ResponseEntity<ApiResponse<Void>> DeleteMember(@PathVariable Long id) {
 		memberService.deleteMember(id);
@@ -118,10 +121,10 @@ public class MemberController {
 						.message("Delet member Successful")
 						.data(null)
 						.build()
-						
 				);
-		}
-	
+	}
+
+	@Operation(summary = "Supprimer plusieurs membres")
 	@DeleteMapping
 	ResponseEntity<ApiResponse<Void>> DelectSelectedMember(@RequestParam List<Long> memberIds) {
 		memberService.deleteManyMember(memberIds);
@@ -132,9 +135,6 @@ public class MemberController {
 						.message("Delet member Successful")
 						.data(null)
 						.build()
-						
 				);
 	}
 }
-	
-

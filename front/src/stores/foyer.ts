@@ -84,7 +84,11 @@ function isPastMonth(month: ContributionMonth) {
   return month.year < currentYear || (month.year === currentYear && month.month < currentMonth)
 }
 
-function createMonth(year: number, month: number, amount = DEFAULT_MONTH_AMOUNT): ContributionMonth {
+function createMonth(
+  year: number,
+  month: number,
+  amount = DEFAULT_MONTH_AMOUNT,
+): ContributionMonth {
   const now = timestamp()
 
   return {
@@ -176,7 +180,8 @@ function buildPayments(members: Member[], months: ContributionMonth[]): Payment[
       const memberCreatedAt = new Date(member.createdAt)
       const joinedAfterMonth =
         memberCreatedAt.getFullYear() > month.year ||
-        (memberCreatedAt.getFullYear() === month.year && memberCreatedAt.getMonth() + 1 > month.month)
+        (memberCreatedAt.getFullYear() === month.year &&
+          memberCreatedAt.getMonth() + 1 > month.month)
 
       if (joinedAfterMonth) return
 
@@ -204,9 +209,34 @@ function buildPayments(members: Member[], months: ContributionMonth[]): Payment[
 export const useFoyerStore = defineStore('foyer', () => {
   const initialMonths = buildMonths()
 
-  const members = ref<Member[]>([...mockMembers])
-  const months = ref<ContributionMonth[]>(initialMonths)
-  const payments = ref<Payment[]>(buildPayments(mockMembers, initialMonths))
+  const members = ref<Member[]>([])
+  const months = ref<ContributionMonth[]>([])
+  const payments = ref<Payment[]>([])
+
+  async function fetchData() {
+    const api = import.meta.env.VITE_API_URL
+    try {
+      const [membersRes, monthsRes, paymentsRes] = await Promise.all([
+        fetch(`${api}/api/v1/members`),
+        fetch(`${api}/api/v1/months`),
+        fetch(`${api}/api/v1/payments`),
+      ])
+
+      if (!membersRes.ok || !monthsRes.ok || !paymentsRes.ok) {
+        throw new Error('Failed to fetch data from API')
+      }
+
+      members.value = await membersRes.json()
+      months.value = await monthsRes.json()
+      payments.value = await paymentsRes.json()
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      // Fallback to mock data in case of error
+      members.value = mockMembers
+      months.value = initialMonths
+      payments.value = buildPayments(mockMembers, initialMonths)
+    }
+  }
 
   function ensureMonth(year: number, month: number) {
     const existing = getMonth(year, month)
@@ -316,7 +346,9 @@ export const useFoyerStore = defineStore('foyer', () => {
   function getStatsForMonth(contributionMonthId: string) {
     const month = months.value.find((item) => item.id === contributionMonthId)
     const totalMembers = members.value.length
-    const monthPayments = payments.value.filter((payment) => payment.monthId === contributionMonthId)
+    const monthPayments = payments.value.filter(
+      (payment) => payment.monthId === contributionMonthId,
+    )
     const paidPayments = monthPayments.filter((payment) => payment.isPaid)
     const lateCount = members.value.filter(
       (member) => getPaymentStatus(member.id, contributionMonthId) === 'late',
@@ -362,6 +394,7 @@ export const useFoyerStore = defineStore('foyer', () => {
   }
 
   return {
+    fetchData,
     members,
     months,
     payments,
