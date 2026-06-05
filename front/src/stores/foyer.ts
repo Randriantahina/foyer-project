@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { memberApi } from '@/services/memberApi'
+import { subscriptionApi } from '@/services/subscriptionApi'
+import { payApi } from '@/services/payApi'
+import { MONTH_NAMES, monthId, monthName, isPastMonth } from '@/utils/date'
+
+// ─── Types publics (Model) ────────────────────────────────────────────────────
+
+export { MONTH_NAMES }
 
 export interface Member {
   id: string
@@ -43,20 +51,7 @@ export interface PaymentInput {
   note: string
 }
 
-export const MONTH_NAMES = [
-  'Janvier',
-  'Février',
-  'Mars',
-  'Avril',
-  'Mai',
-  'Juin',
-  'Juillet',
-  'Août',
-  'Septembre',
-  'Octobre',
-  'Novembre',
-  'Décembre',
-]
+// ─── Helpers internes ─────────────────────────────────────────────────────────
 
 const DEFAULT_MONTH_AMOUNT = 120_000
 
@@ -68,127 +63,42 @@ function timestamp() {
   return new Date().toISOString()
 }
 
-function monthId(year: number, month: number) {
-  return `${year}-${String(month).padStart(2, '0')}`
-}
-
-function monthName(year: number, month: number) {
-  return `${MONTH_NAMES[month - 1] ?? 'Mois'} ${year}`
-}
-
-function isPastMonth(month: ContributionMonth) {
-  const now = new Date()
-  const currentYear = now.getFullYear()
-  const currentMonth = now.getMonth() + 1
-
-  return month.year < currentYear || (month.year === currentYear && month.month < currentMonth)
-}
-
-function createMonth(
-  year: number,
-  month: number,
-  amount = DEFAULT_MONTH_AMOUNT,
-): ContributionMonth {
+function createMonth(year: number, month: number, amount = DEFAULT_MONTH_AMOUNT): ContributionMonth {
   const now = timestamp()
-
-  return {
-    id: monthId(year, month),
-    name: monthName(year, month),
-    month,
-    year,
-    amount,
-    createdAt: now,
-    updatedAt: now,
-  }
+  return { id: monthId(year, month), name: monthName(year, month), month, year, amount, createdAt: now, updatedAt: now }
 }
 
-function buildMonths(): ContributionMonth[] {
+// ─── Mock data (fallback si API inaccessible) ─────────────────────────────────
+
+const mockMembers: Member[] = [
+  { id: '1', firstName: 'Jean',   lastName: 'Rakoto',          phone: '+261 34 12 345 67', createdAt: '2025-09-01T08:00:00.000Z', updatedAt: '2025-09-01T08:00:00.000Z' },
+  { id: '2', firstName: 'Marie',  lastName: 'Rasoa',           phone: '+261 33 45 678 90', createdAt: '2025-09-01T08:20:00.000Z', updatedAt: '2025-09-01T08:20:00.000Z' },
+  { id: '3', firstName: 'Pierre', lastName: 'Andrianina',      phone: '+261 32 22 111 44', createdAt: '2025-10-15T10:00:00.000Z', updatedAt: '2025-10-15T10:00:00.000Z' },
+  { id: '4', firstName: 'Sophie', lastName: 'Raveloson',       phone: '+261 38 88 555 21', createdAt: '2025-11-03T09:30:00.000Z', updatedAt: '2025-11-03T09:30:00.000Z' },
+  { id: '5', firstName: 'Lucas',  lastName: 'Randria',         phone: '+261 34 77 009 18', createdAt: '2026-01-10T13:15:00.000Z', updatedAt: '2026-01-10T13:15:00.000Z' },
+  { id: '6', firstName: 'Emma',   lastName: 'Nomenjanahary',   phone: '+261 33 19 456 02', createdAt: '2026-03-05T11:45:00.000Z', updatedAt: '2026-03-05T11:45:00.000Z' },
+]
+
+function buildMockMonths(): ContributionMonth[] {
   const months: ContributionMonth[] = []
   const now = new Date()
   let year = 2025
   let month = 1
-
   while (year < now.getFullYear() || (year === now.getFullYear() && month <= now.getMonth() + 1)) {
     months.push(createMonth(year, month))
-    month += 1
-
-    if (month > 12) {
-      month = 1
-      year += 1
-    }
+    month = month === 12 ? ((year++), 1) : month + 1
   }
-
   return months
 }
 
-const mockMembers: Member[] = [
-  {
-    id: '1',
-    firstName: 'Jean',
-    lastName: 'Rakoto',
-    phone: '+261 34 12 345 67',
-    createdAt: '2025-09-01T08:00:00.000Z',
-    updatedAt: '2025-09-01T08:00:00.000Z',
-  },
-  {
-    id: '2',
-    firstName: 'Marie',
-    lastName: 'Rasoa',
-    phone: '+261 33 45 678 90',
-    createdAt: '2025-09-01T08:20:00.000Z',
-    updatedAt: '2025-09-01T08:20:00.000Z',
-  },
-  {
-    id: '3',
-    firstName: 'Pierre',
-    lastName: 'Andrianina',
-    phone: '+261 32 22 111 44',
-    createdAt: '2025-10-15T10:00:00.000Z',
-    updatedAt: '2025-10-15T10:00:00.000Z',
-  },
-  {
-    id: '4',
-    firstName: 'Sophie',
-    lastName: 'Raveloson',
-    phone: '+261 38 88 555 21',
-    createdAt: '2025-11-03T09:30:00.000Z',
-    updatedAt: '2025-11-03T09:30:00.000Z',
-  },
-  {
-    id: '5',
-    firstName: 'Lucas',
-    lastName: 'Randria',
-    phone: '+261 34 77 009 18',
-    createdAt: '2026-01-10T13:15:00.000Z',
-    updatedAt: '2026-01-10T13:15:00.000Z',
-  },
-  {
-    id: '6',
-    firstName: 'Emma',
-    lastName: 'Nomenjanahary',
-    phone: '+261 33 19 456 02',
-    createdAt: '2026-03-05T11:45:00.000Z',
-    updatedAt: '2026-03-05T11:45:00.000Z',
-  },
-]
-
-function buildPayments(members: Member[], months: ContributionMonth[]): Payment[] {
+function buildMockPayments(members: Member[], months: ContributionMonth[]): Payment[] {
   const payments: Payment[] = []
-
   months.forEach((month) => {
-    members.forEach((member, memberIndex) => {
-      const memberCreatedAt = new Date(member.createdAt)
-      const joinedAfterMonth =
-        memberCreatedAt.getFullYear() > month.year ||
-        (memberCreatedAt.getFullYear() === month.year &&
-          memberCreatedAt.getMonth() + 1 > month.month)
-
-      if (joinedAfterMonth) return
-
-      const paid = isPastMonth(month)
-        ? (memberIndex + month.month) % 6 !== 0
-        : memberIndex % 3 !== 0
-
+    members.forEach((member, i) => {
+      const joined = new Date(member.createdAt)
+      const joinedAfter = joined.getFullYear() > month.year || (joined.getFullYear() === month.year && joined.getMonth() + 1 > month.month)
+      if (joinedAfter) return
+      const paid = isPastMonth(month.month, month.year) ? (i + month.month) % 6 !== 0 : i % 3 !== 0
       payments.push({
         id: `${member.id}-${month.id}`,
         memberId: member.id,
@@ -202,207 +112,242 @@ function buildPayments(members: Member[], months: ContributionMonth[]): Payment[
       })
     })
   })
-
   return payments
 }
 
-export const useFoyerStore = defineStore('foyer', () => {
-  const initialMonths = buildMonths()
+// ─── ViewModel (Store Pinia) ──────────────────────────────────────────────────
 
-  const members = ref<Member[]>([])
-  const months = ref<ContributionMonth[]>([])
+export const useFoyerStore = defineStore('foyer', () => {
+  const members  = ref<Member[]>([])
+  const months   = ref<ContributionMonth[]>([])
   const payments = ref<Payment[]>([])
 
+  // Clé interne : "YYYY-MM" → ID subscription backend (nécessaire pour créer un pay)
+  const subscriptionIdMap = ref<Map<string, number>>(new Map())
+
+  // ── Chargement initial ──────────────────────────────────────────────────────
+
   async function fetchData() {
-    const api = import.meta.env.VITE_API_URL
     try {
-      const [membersRes, monthsRes, paymentsRes] = await Promise.all([
-        fetch(`${api}/api/v1/members`),
-        fetch(`${api}/api/v1/months`),
-        fetch(`${api}/api/v1/payments`),
+      const [fetchedMembers, { months: fetchedMonths, idMap }] = await Promise.all([
+        memberApi.getAll(),
+        subscriptionApi.getAll(),
       ])
 
-      if (!membersRes.ok || !monthsRes.ok || !paymentsRes.ok) {
-        throw new Error('Failed to fetch data from API')
-      }
+      subscriptionIdMap.value = idMap
 
-      members.value = await membersRes.json()
-      months.value = await monthsRes.json()
-      payments.value = await paymentsRes.json()
+      const allPays = (
+        await Promise.all(fetchedMonths.map((m) => payApi.getByMonthYear(m.month, m.year)))
+      ).flat()
+
+      const payKeys = new Set(allPays.map((p) => `${p.memberId}-${p.monthId}`))
+
+      // Enregistrements virtuels "non payé" pour les combos sans pay backend
+      const virtualPays: Payment[] = []
+      fetchedMembers.forEach((member) => {
+        fetchedMonths.forEach((month) => {
+          const key = `${member.id}-${month.id}`
+          if (!payKeys.has(key)) {
+            virtualPays.push({
+              id: `virtual-${key}`,
+              memberId: member.id,
+              monthId: month.id,
+              isPaid: false,
+              amountPaid: 0,
+              note: '',
+              createdAt: '',
+              updatedAt: '',
+            })
+          }
+        })
+      })
+
+      members.value  = fetchedMembers
+      months.value   = fetchedMonths
+      payments.value = [...allPays, ...virtualPays]
     } catch (error) {
-      console.error('Error fetching data:', error)
-      // Fallback to mock data in case of error
-      members.value = mockMembers
-      months.value = initialMonths
-      payments.value = buildPayments(mockMembers, initialMonths)
+      console.error('API inaccessible, données mock utilisées :', error)
+      const mockMonths = buildMockMonths()
+      members.value  = mockMembers
+      months.value   = mockMonths
+      payments.value = buildMockPayments(mockMembers, mockMonths)
     }
   }
 
-  function ensureMonth(year: number, month: number) {
-    const existing = getMonth(year, month)
-    if (existing) return existing
+  // ── Mois ────────────────────────────────────────────────────────────────────
 
+  function ensureMonth(year: number, month: number): ContributionMonth {
+    const existing = months.value.find((m) => m.year === year && m.month === month)
+    if (existing) return existing
     const created = createMonth(year, month)
     months.value.push(created)
     months.value.sort((a, b) => a.year - b.year || a.month - b.month)
     return created
   }
 
-  function getMonth(year: number, month: number) {
-    return months.value.find((item) => item.year === year && item.month === month)
+  function getMonth(year: number, month: number): ContributionMonth | undefined {
+    return months.value.find((m) => m.year === year && m.month === month)
   }
 
-  function getPayment(memberId: string, contributionMonthId: string) {
-    return payments.value.find(
-      (payment) => payment.memberId === memberId && payment.monthId === contributionMonthId,
-    )
+  // ── Paiements ───────────────────────────────────────────────────────────────
+
+  function getPayment(memberId: string, contributionMonthId: string): Payment | undefined {
+    return payments.value.find((p) => p.memberId === memberId && p.monthId === contributionMonthId)
   }
 
   function getPaymentStatus(memberId: string, contributionMonthId: string): PaymentStatus {
-    const month = months.value.find((item) => item.id === contributionMonthId)
+    const month   = months.value.find((m) => m.id === contributionMonthId)
     const payment = getPayment(memberId, contributionMonthId)
-
     if (payment?.isPaid) return 'paid'
-    if (month && isPastMonth(month)) return 'late'
+    if (month && isPastMonth(month.month, month.year)) return 'late'
     return 'pending'
   }
 
-  async function addMember(data: Pick<Member, 'firstName' | 'lastName' | 'phone'>) {
-    const api = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/members`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const member: Member = await api.json()
-    members.value.push(member)
-    return member
-  }
-
-  function removeMember(id: string) {
-    members.value = members.value.filter((member) => member.id !== id)
-    payments.value = payments.value.filter((payment) => payment.memberId !== id)
-  }
-
-  function savePayment(data: PaymentInput) {
+  function savePayment(data: PaymentInput): Payment {
     const existing = getPayment(data.memberId, data.monthId)
     const now = timestamp()
 
     if (existing) {
-      existing.isPaid = data.isPaid
+      // Mise à jour optimiste locale
+      existing.isPaid     = data.isPaid
       existing.amountPaid = data.isPaid ? data.amountPaid : 0
-      existing.paidAt = data.isPaid ? data.paidAt : undefined
-      existing.note = data.note
-      existing.updatedAt = now
+      existing.paidAt     = data.isPaid ? data.paidAt : undefined
+      existing.note       = data.note
+      existing.updatedAt  = now
+
+      const backendSubId = subscriptionIdMap.value.get(data.monthId)
+
+      if (existing.id.startsWith('virtual-') && backendSubId) {
+        // Crée un vrai pay côté backend, remplace le virtuel quand c'est fait
+        payApi
+          .create(data.memberId, backendSubId, { amountPaid: data.amountPaid, note: data.note })
+          .then((created) => {
+            if (!created) return
+            const idx = payments.value.findIndex((p) => p.id === existing.id)
+            if (idx !== -1) payments.value[idx] = created
+          })
+          .catch(console.error)
+      } else if (!existing.id.startsWith('virtual-')) {
+        payApi
+          .update(existing.id, { amountPaid: data.amountPaid, note: data.note })
+          .then((updated) => {
+            if (!updated) return
+            const idx = payments.value.findIndex((p) => p.id === existing.id)
+            if (idx !== -1) payments.value[idx] = updated
+          })
+          .catch(console.error)
+      }
+
       return existing
     }
 
+    // Nouveau pay : crée localement et synchronise en arrière-plan
+    const virtualId = `virtual-${data.memberId}-${data.monthId}`
     const payment: Payment = {
-      id: `${data.memberId}-${data.monthId}`,
-      memberId: data.memberId,
-      monthId: data.monthId,
-      isPaid: data.isPaid,
-      amountPaid: data.isPaid ? data.amountPaid : 0,
-      paidAt: data.isPaid ? data.paidAt : undefined,
-      note: data.note,
-      createdAt: now,
-      updatedAt: now,
+      id: virtualId,
+      memberId:    data.memberId,
+      monthId:     data.monthId,
+      isPaid:      data.isPaid,
+      amountPaid:  data.isPaid ? data.amountPaid : 0,
+      paidAt:      data.isPaid ? data.paidAt : undefined,
+      note:        data.note,
+      createdAt:   now,
+      updatedAt:   now,
+    }
+    payments.value.push(payment)
+
+    const backendSubId = subscriptionIdMap.value.get(data.monthId)
+    if (backendSubId) {
+      payApi
+        .create(data.memberId, backendSubId, { amountPaid: data.amountPaid, note: data.note })
+        .then((created) => {
+          if (!created) return
+          const idx = payments.value.findIndex((p) => p.id === virtualId)
+          if (idx !== -1) payments.value[idx] = created
+        })
+        .catch(console.error)
     }
 
-    payments.value.push(payment)
     return payment
   }
 
-  function markAsPaid(memberId: string, contributionMonthId: string) {
-    const month = months.value.find((item) => item.id === contributionMonthId)
+  function markAsPaid(memberId: string, contributionMonthId: string): void {
+    const month = months.value.find((m) => m.id === contributionMonthId)
     if (!month) return
-
-    savePayment({
-      memberId,
-      monthId: contributionMonthId,
-      isPaid: true,
-      amountPaid: month.amount,
-      paidAt: todayIso(),
-      note: 'Paiement reçu',
-    })
+    savePayment({ memberId, monthId: contributionMonthId, isPaid: true, amountPaid: month.amount, paidAt: todayIso(), note: 'Paiement reçu' })
   }
 
-  function markAsUnpaid(memberId: string, contributionMonthId: string) {
+  function markAsUnpaid(memberId: string, contributionMonthId: string): void {
     const existing = getPayment(memberId, contributionMonthId)
-
-    savePayment({
-      memberId,
-      monthId: contributionMonthId,
-      isPaid: false,
-      amountPaid: 0,
-      paidAt: undefined,
-      note: existing?.note ?? '',
-    })
+    savePayment({ memberId, monthId: contributionMonthId, isPaid: false, amountPaid: 0, paidAt: undefined, note: existing?.note ?? '' })
   }
+
+  // ── Membres ─────────────────────────────────────────────────────────────────
+
+  async function addMember(data: Pick<Member, 'firstName' | 'lastName' | 'phone'>): Promise<Member> {
+    const member = await memberApi.create(data)
+    members.value.push(member)
+    return member
+  }
+
+  function removeMember(id: string): void {
+    members.value  = members.value.filter((m) => m.id !== id)
+    payments.value = payments.value.filter((p) => p.memberId !== id)
+    memberApi.delete(id)
+  }
+
+  // ── Statistiques ─────────────────────────────────────────────────────────────
 
   function getStatsForMonth(contributionMonthId: string) {
-    const month = months.value.find((item) => item.id === contributionMonthId)
-    const totalMembers = members.value.length
-    const monthPayments = payments.value.filter(
-      (payment) => payment.monthId === contributionMonthId,
-    )
-    const paidPayments = monthPayments.filter((payment) => payment.isPaid)
-    const lateCount = members.value.filter(
-      (member) => getPaymentStatus(member.id, contributionMonthId) === 'late',
-    ).length
-    const expectedAmount = totalMembers * (month?.amount ?? 0)
-    const collectedAmount = paidPayments.reduce((sum, payment) => sum + payment.amountPaid, 0)
+    const month         = months.value.find((m) => m.id === contributionMonthId)
+    const totalMembers  = members.value.length
+    const monthPayments = payments.value.filter((p) => p.monthId === contributionMonthId)
+    const paidPayments  = monthPayments.filter((p) => p.isPaid)
+    const lateCount     = members.value.filter((m) => getPaymentStatus(m.id, contributionMonthId) === 'late').length
 
     return {
       totalMembers,
-      paidCount: paidPayments.length,
-      unpaidCount: totalMembers - paidPayments.length,
+      paidCount:        paidPayments.length,
+      unpaidCount:      totalMembers - paidPayments.length,
       lateCount,
-      expectedAmount,
-      collectedAmount,
+      expectedAmount:   totalMembers * (month?.amount ?? 0),
+      collectedAmount:  paidPayments.reduce((sum, p) => sum + p.amountPaid, 0),
     }
   }
 
   function getStatsForYear(year: number) {
-    const yearMonths = months.value.filter((month) => month.year === year)
-    const yearPayments = payments.value.filter((payment) =>
-      yearMonths.some((month) => month.id === payment.monthId),
-    )
-    const paidPayments = yearPayments.filter((payment) => payment.isPaid)
-    const lateCount = members.value.reduce(
-      (count, member) =>
-        count +
-        yearMonths.filter((month) => getPaymentStatus(member.id, month.id) === 'late').length,
-      0,
-    )
-    const expectedAmount = yearMonths.reduce(
-      (sum, month) => sum + month.amount * members.value.length,
+    const yearMonths   = months.value.filter((m) => m.year === year)
+    const yearPayments = payments.value.filter((p) => yearMonths.some((m) => m.id === p.monthId))
+    const paidPayments = yearPayments.filter((p) => p.isPaid)
+    const lateCount    = members.value.reduce(
+      (count, member) => count + yearMonths.filter((m) => getPaymentStatus(member.id, m.id) === 'late').length,
       0,
     )
 
     return {
-      totalMembers: members.value.length,
-      paidSlots: paidPayments.length,
-      unpaidSlots: yearMonths.length * members.value.length - paidPayments.length,
-      lateSlots: lateCount,
-      expectedAmount,
-      collectedAmount: paidPayments.reduce((sum, payment) => sum + payment.amountPaid, 0),
+      totalMembers:   members.value.length,
+      paidSlots:      paidPayments.length,
+      unpaidSlots:    yearMonths.length * members.value.length - paidPayments.length,
+      lateSlots:      lateCount,
+      expectedAmount: yearMonths.reduce((sum, m) => sum + m.amount * members.value.length, 0),
+      collectedAmount: paidPayments.reduce((sum, p) => sum + p.amountPaid, 0),
     }
   }
 
   return {
-    fetchData,
     members,
     months,
     payments,
+    fetchData,
     ensureMonth,
     getMonth,
     getPayment,
     getPaymentStatus,
-    addMember,
-    removeMember,
     savePayment,
     markAsPaid,
     markAsUnpaid,
+    addMember,
+    removeMember,
     getStatsForMonth,
     getStatsForYear,
   }
