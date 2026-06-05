@@ -1,0 +1,237 @@
+[4mSED[24m(1)                                                                                User Commands                                                                                [4mSED[24m(1)
+
+[1mNAME[0m
+       sed - stream editor for filtering and transforming text
+
+[1mSYNOPSIS[0m
+       sed [-V] [--version] [--help] [-n] [--quiet] [--silent]
+           [-l N] [--line-length=N] [-u] [--unbuffered]
+           [-E] [-r] [--regexp-extended]
+           [-e script] [--expression=script]
+           [-f script-file] [--file=script-file]
+           [script-if-no-other-script]
+           [file...]
+
+[1mDESCRIPTION[0m
+       [4mSed[24m is a stream editor.  A stream editor is used to perform basic text transformations on an input stream (a file or input from a pipeline).  While in some ways similar to an ed‐
+       itor  which  permits scripted edits (such as [4med[24m), [4msed[24m works by making only one pass over the input(s), and is consequently more efficient.  But it is [4msed[24m's ability to filter text
+       in a pipeline which particularly distinguishes it from other types of editors.
+
+       [1m-n[22m, [1m--quiet[22m, [1m--silent[0m
+
+              suppress automatic printing of pattern space
+
+       [1m--debug[0m
+
+              annotate program execution
+
+       [1m-e [22mscript, [1m--expression[22m=[4mscript[0m
+
+              add the script to the commands to be executed
+
+       [1m-f [22mscript-file, [1m--file[22m=[4mscript-file[0m
+
+              add the contents of script-file to the commands to be executed
+
+       [1m--follow-symlinks[0m
+
+              follow symlinks when processing in place
+
+       [1m-i[SUFFIX][22m, [1m--in-place[22m[=[4mSUFFIX[24m]
+
+              edit files in place (makes backup if SUFFIX supplied)
+
+       [1m-l [22mN, [1m--line-length[22m=[4mN[0m
+
+              specify the desired line-wrap length for the `l' command
+
+       [1m--posix[0m
+
+              disable all GNU extensions.
+
+       [1m-E[22m, [1m-r[22m, [1m--regexp-extended[0m
+
+              use extended regular expressions in the script (for portability use POSIX [1m-E[22m).
+
+       [1m-s[22m, [1m--separate[0m
+
+              consider files as separate rather than as a single, continuous long stream.
+
+       [1m--sandbox[0m
+
+              operate in sandbox mode (disable e/r/w commands).
+
+       [1m-u[22m, [1m--unbuffered[0m
+
+              load minimal amounts of data from the input files and flush the output buffers more often
+
+       [1m-z[22m, [1m--null-data[0m
+
+              separate lines by NUL characters
+
+       [1m--help[0m
+              display this help and exit
+
+       [1m--version[0m
+              output version information and exit
+
+       If no [1m-e[22m, [1m--expression[22m, [1m-f[22m, or [1m--file [22moption is given, then the first non-option argument is taken as the sed script to interpret.  All remaining arguments  are  names  of  input
+       files; if no input files are specified, then the standard input is read.
+
+       GNU sed home page: <https://www.gnu.org/software/sed/>.  General help using GNU software: <https://www.gnu.org/gethelp/>.  E-mail bug reports to: <bug-sed@gnu.org>.
+
+       Packaged  by  Debian  Copyright © 2022 Free Software Foundation, Inc.  License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.  This is free software: you
+       are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+[1mCOMMAND SYNOPSIS[0m
+       This is just a brief synopsis of [4msed[24m commands to serve as a reminder to those who already know [4msed[24m; other documentation (such as the  texinfo  document)  must  be  consulted  for
+       fuller descriptions.
+
+   [1mZero-address ``commands''[0m
+       : [4mlabel[0m
+              Label for [1mb [22mand [1mt [22mcommands.
+
+       #[4mcomment[0m
+              The comment extends until the next newline (or the end of a [1m-e [22mscript fragment).
+
+       }      The closing bracket of a { } block.
+
+   [1mZero- or One- address commands[0m
+       =      Print the current line number.
+
+       a \
+
+       [4mtext[24m   Append [4mtext[24m, which has each embedded newline preceded by a backslash.
+
+       i \
+
+       [4mtext[24m   Insert [4mtext[24m, which has each embedded newline preceded by a backslash.
+
+       q [[4mexit-code[24m]
+              Immediately  quit the [4msed[24m script without processing any more input, except that if auto-print is not disabled the current pattern space will be printed.  The exit code ar‐
+              gument is a GNU extension.
+
+       Q [[4mexit-code[24m]
+              Immediately quit the [4msed[24m script without processing any more input.  This is a GNU extension.
+
+       r [4mfilename[0m
+              Append text read from [4mfilename[24m.
+
+       R [4mfilename[0m
+              Append a line read from [4mfilename[24m.  Each invocation of the command reads a line from the file.  This is a GNU extension.
+
+   [1mCommands which accept address ranges[0m
+       {      Begin a block of commands (end with a }).
+
+       b [4mlabel[0m
+              Branch to [4mlabel[24m; if [4mlabel[24m is omitted, branch to end of script.
+
+       c \
+
+       [4mtext[24m   Replace the selected lines with [4mtext[24m, which has each embedded newline preceded by a backslash.
+
+       d      Delete pattern space.  Start next cycle.
+
+       D      If pattern space contains no newline, start a normal new cycle as if the d command was issued.  Otherwise, delete text in the pattern space up to the  first  newline,  and
+              restart cycle with the resultant pattern space, without reading a new line of input.
+
+       h H    Copy/append pattern space to hold space.
+
+       g G    Copy/append hold space to pattern space.
+
+       l      List out the current line in a ``visually unambiguous'' form.
+
+       l [4mwidth[0m
+              List out the current line in a ``visually unambiguous'' form, breaking it at [4mwidth[24m characters.  This is a GNU extension.
+
+       n N    Read/append the next line of input into the pattern space.
+
+       p      Print the current pattern space.
+
+       P      Print up to the first embedded newline of the current pattern space.
+
+       s/[4mregexp[24m/[4mreplacement[24m/
+              Attempt  to  match [4mregexp[24m against the pattern space.  If successful, replace that portion matched with [4mreplacement[24m.  The [4mreplacement[24m may contain the special character [1m& [22mto
+              refer to that portion of the pattern space which matched, and the special escapes \1 through \9 to refer to the corresponding matching sub-expressions in the [4mregexp[24m.
+
+       t [4mlabel[0m
+              If a s/// has done a successful substitution since the last input line was read and since the last t or T command, then branch to [4mlabel[24m; if [4mlabel[24m is omitted, branch to end
+              of script.
+
+       T [4mlabel[0m
+              If no s/// has done a successful substitution since the last input line was read and since the last t or T command, then branch to [4mlabel[24m; if [4mlabel[24m is  omitted,  branch  to
+              end of script.  This is a GNU extension.
+
+       w [4mfilename[0m
+              Write the current pattern space to [4mfilename[24m.
+
+       W [4mfilename[0m
+              Write the first line of the current pattern space to [4mfilename[24m.  This is a GNU extension.
+
+       x      Exchange the contents of the hold and pattern spaces.
+
+       y/[4msource[24m/[4mdest[24m/
+              Transliterate the characters in the pattern space which appear in [4msource[24m to the corresponding character in [4mdest[24m.
+
+[1mAddresses[0m
+       [4mSed[24m commands can be given with no addresses, in which case the command will be executed for all input lines; with one address, in which case the command will only be executed for
+       input lines which match that address; or with two addresses, in which case the command will be executed for all input lines which match the inclusive range of lines starting from
+       the  first address and continuing to the second address.  Three things to note about address ranges: the syntax is [4maddr1[24m,[4maddr2[24m (i.e., the addresses are separated by a comma); the
+       line which [4maddr1[24m matched will always be accepted, even if [4maddr2[24m selects an earlier line; and if [4maddr2[24m is a [4mregexp[24m, it will not be tested against the line that [4maddr1[24m matched.
+
+       After the address (or address-range), and before the command, a [1m!  [22mmay be inserted, which specifies that the command shall only be executed if the address (or address-range) does
+       [1mnot [22mmatch.
+
+       The following address types are supported:
+
+       [4mnumber[24m Match only the specified line [4mnumber[24m (which increments cumulatively across files, unless the [1m-s [22moption is specified on the command line).
+
+       [4mfirst[24m~[4mstep[0m
+              Match every [4mstep[24m'th line starting with line [4mfirst[24m.  For example, ``sed -n 1~2p'' will print all the odd-numbered lines in the input stream, and the address 2~5 will  match
+              every fifth line, starting with the second.  [4mfirst[24m can be zero; in this case, [4msed[24m operates as if it were equal to [4mstep[24m.  (This is an extension.)
+
+       $      Match the last line.
+
+       /[4mregexp[24m/
+              Match lines matching the regular expression [4mregexp[24m.  Matching is performed on the current pattern space, which can be modified with commands such as ``s///''.
+
+       \[1mc[4m[22mregexp[24m[1mc[0m
+              Match lines matching the regular expression [4mregexp[24m.  The [1mc [22mmay be any character.
+
+       GNU [4msed[24m also supports some special 2-address forms:
+
+       0,[4maddr2[0m
+              Start  out  in "matched first address" state, until [4maddr2[24m is found.  This is similar to 1,[4maddr2[24m, except that if [4maddr2[24m matches the very first line of input the 0,[4maddr2[24m form
+              will be at the end of its range, whereas the 1,[4maddr2[24m form will still be at the beginning of its range.  This works only when [4maddr2[24m is a regular expression.
+
+       [4maddr1[24m,+[4mN[0m
+              Will match [4maddr1[24m and the [4mN[24m lines following [4maddr1[24m.
+
+       [4maddr1[24m,~[4mN[0m
+              Will match [4maddr1[24m and the lines following [4maddr1[24m until the next line whose input line number is a multiple of [4mN[24m.
+
+[1mREGULAR EXPRESSIONS[0m
+       POSIX.2 BREs [4mshould[24m be supported, but they aren't completely because of performance problems.  The [1m\n [22msequence in a regular expression matches the newline  character,  and  simi‐
+       larly  for  [1m\a[22m, [1m\t[22m, and other sequences.  The [4m-E[24m option switches to using extended regular expressions instead; it has been supported for years by GNU sed, and is now included in
+       POSIX.
+
+[1mBUGS[0m
+       E-mail bug reports to [1mbug-sed@gnu.org[22m.  Also, please include the output of ``sed --version'' in the body of your report if at all possible.
+
+[1mAUTHOR[0m
+       Written by Jay Fenlason, Tom Lord, Ken Pizzini, Paolo Bonzini, Jim Meyering, and Assaf Gordon.
+
+       This sed program was built with SELinux support.  SELinux is disabled on this system.
+
+       GNU sed home page: <https://www.gnu.org/software/sed/>.  General help using GNU software: <https://www.gnu.org/gethelp/>.  E-mail bug reports to: <bug-sed@gnu.org>.
+
+[1mSEE ALSO[0m
+       [1mawk[22m(1), [1med[22m(1), [1mgrep[22m(1), [1mtr[22m(1), [1mperlre[22m(1), sed.info, any of various books on [4msed[24m, the [4msed[24m FAQ (http://sed.sf.net/grabbag/tutorials/sedfaq.txt), http://sed.sf.net/grabbag/.
+
+       The full documentation for [1msed [22mis maintained as a Texinfo manual.  If the [1minfo [22mand [1msed [22mprograms are properly installed at your site, the command
+
+              [1minfo sed[0m
+
+       should give you access to the complete manual.
+
+GNU sed 4.9                                                                             April 2026                                                                                 [4mSED[24m(1)
