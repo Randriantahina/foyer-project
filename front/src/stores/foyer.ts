@@ -267,17 +267,13 @@ export const useFoyerStore = defineStore('foyer', () => {
     return 'pending'
   }
 
-  function addMember(data: Pick<Member, 'firstName' | 'lastName' | 'phone'>) {
-    const now = timestamp()
-    const member: Member = {
-      id: String(Date.now()),
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      createdAt: now,
-      updatedAt: now,
-    }
-
+  async function addMember(data: Pick<Member, 'firstName' | 'lastName' | 'phone'>) {
+    const api = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const member: Member = await api.json()
     members.value.push(member)
     return member
   }
